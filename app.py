@@ -1,22 +1,29 @@
-# app.py — Крок 6: Інтеграція з LangGraph-агентом (Gemini)
+# app.py — Чатбот-асистент фінансового обліку (Gemini + LangGraph)
 
+import json
 import uuid
+from datetime import datetime
 
 import streamlit as st
 from google import genai
 from google.genai import types
 
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 
 # Імпортуємо агента
-from agent import create_agent, extract_response_text, extract_tools_debug, MODEL_NAME
+from agent import (
+    create_agent,
+    extract_response_text,
+    extract_tools_debug,
+    MODEL_NAME,
+)
 
 # ============================================================
 # НАЛАШТУВАННЯ СТОРІНКИ
 # ============================================================
 st.set_page_config(
-    page_title="AI Чатбот з Gemini",
-    page_icon="🤖",
+    page_title="Фінансовий AI-Асистент",
+    page_icon="💸",
     layout="centered",
     initial_sidebar_state="expanded",
 )
@@ -37,61 +44,10 @@ if not api_key:
     st.error("❌ Не знайдено GOOGLE_API_KEY у secrets.toml")
     st.stop()
 
-# ============================================================
-# ЗАГОЛОВОК
-# ============================================================
-st.title("🤖 AI Чатбот з Gemini")
+agent = get_langgraph_agent(api_key, MODEL_NAME)
 
 # ============================================================
-# БІЧНА ПАНЕЛЬ
-# ============================================================
-with st.sidebar:
-    st.header("⚙️ Налаштування")
-
-    mode = st.radio(
-        "Режим",
-        ["💬 Звичайний чат", "🛠️ Агент з інструментами"],
-        index=0,
-        key="mode_radio",
-        help="Агент може використовувати калькулятор, Wikipedia та інші інструменти",
-    )
-
-    st.divider()
-    st.info(f"Модель: **{MODEL_NAME}**")
-
-    temperature = st.slider(
-        "Температура (для звичайного чату)",
-        min_value=0.0,
-        max_value=1.0,
-        value=0.7,
-        step=0.1,
-        key="temperature_slider",
-    )
-
-    show_agent_debug = False
-    if "Агент" in mode:
-        show_agent_debug = st.checkbox("Показувати debug агента (tool calls)", value=False)
-
-    st.divider()
-
-    if st.button("🗑️ Очистити історію", use_container_width=True):
-        st.session_state.messages = []
-        st.session_state.thread_id = str(uuid.uuid4())[:8]
-        st.rerun()
-
-    if "Агент" in mode:
-        st.divider()
-        with st.expander("🛠️ Доступні інструменти"):
-            st.markdown(
-                """
-- **calculator** — математичні обчислення
-- **current_datetime** — поточна дата/час
-- **wikipedia_search** — пошук у Wikipedia
-"""
-            )
-
-# ============================================================
-# ІНІЦІАЛІЗАЦІЯ СТАНУ
+# СТАН STREAMLIT
 # ============================================================
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -99,125 +55,164 @@ if "messages" not in st.session_state:
 if "thread_id" not in st.session_state:
     st.session_state.thread_id = str(uuid.uuid4())[:8]
 
-# ============================================================
-# ФУНКЦІЇ ДЛЯ ЗВИЧАЙНОГО РЕЖИМУ (стрімінг)
-# ============================================================
-def convert_to_gemini_history(messages: list) -> list[types.Content]:
-    contents = []
-    for msg in messages:
-        role = "user" if msg["role"] == "user" else "model"
-        contents.append(
-            types.Content(
-                role=role,
-                parts=[types.Part.from_text(text=msg["content"])],
-            )
-        )
-    return contents
+if "system_prompt" not in st.session_state:
+    st.session_state.system_prompt = "Ти корисний фінансовий асистент. Відповідай українською мовою."
 
-def stream_gemini_response(prompt: str, history: list):
-    client = get_gemini_client(api_key)
-    contents = convert_to_gemini_history(history)
-    contents.append(
-        types.Content(
-            role="user",
-            parts=[types.Part.from_text(text=prompt)],
+# Отримуємо ПЛИННИЙ СТАН графа LangGraph (для лімітів та витрат)
+config = {"configurable": {"thread_id": st.session_state.thread_id}}
+graph_state = agent.get_state(config)
+
+# Витягуємо дані зі стану графа (якщо вони там вже є)
+expenses = graph_state.values.get("expenses", []) if graph_state.values else []
+monthly_limit = graph_state.values.get("monthly_limit", 10000.0) if graph_state.values else 10000.0
+total_spent = sum(float(e.get("amount", 0)) for e in expenses)
+
+# ============================================================
+# UI: ЗАГОЛОВОК
+# ============================================================
+st.title("💰 AI-Асистент Особистих Фінансів")
+st.write("Керуйте бюджетом голосом чи текстом: додавайте витрати, встановлюйте ліміти та запитуйте аналітику.")
+
+# ============================================================
+# UI: БІЧНА ПАНЕЛЬ (МОНІТОРИНГ БЮДЖЕТУ)
+# ============================================================
+with st.sidebar:
+    st.header("📊 Мій Бюджет")
+    
+    # 1. Віджет ліміту та прогресу
+    st.metric(label="Поточний ліміт", value=f"{monthly_limit:.2f} грн")
+    st.metric(label="Усього витрачено", value=f"{total_spent:.2f} грн")
+    
+    # Розрахунок прогресу для повзунка
+    if monthly_limit > 0:
+        progress_ratio = min(total_spent / monthly_limit, 1.0)
+        st.progress(progress_ratio)
+        
+        # Попередження про перевищення
+        if total_spent >= monthly_limit:
+            st.error("🚨 Ліміт бюджету вичерпано чи перевищено!")
+        elif total_spent >= monthly_limit * 0.8:
+            st.warning("⚠️ Ви наблизились до 80% вашого ліміту!")
+    else:
+        st.info("Ліміт не встановлено або дорівнює 0.")
+
+    st.divider()
+    
+    # 2. Таблиця з останніми транзакціями
+    st.subheader("📝 Останні витрати")
+    if expenses:
+        # Показуємо останні 5 витрат для компактності
+        st.dataframe(
+            expenses[::-1][:5], 
+            column_config={
+                "amount": "Сума (грн)",
+                "category": "Категорія",
+                "description": "Опис"
+            },
+            use_container_width=True,
+            hide_index=True
         )
+    else:
+        st.caption("Немає записаних витрат.")
+
+    st.divider()
+    
+    # Налаштування режиму чату
+    mode = st.radio(
+        "Режим роботи",
+        ["🛠️ Агент з інструментами", "💬 Звичайний чат (без БД)"],
+        index=0,
+        key="mode_radio",
     )
 
-    try:
-        stream = client.models.generate_content_stream(
-            model=MODEL_NAME,
-            contents=contents,
-            config=types.GenerateContentConfig(
-                temperature=temperature,
-                max_output_tokens=2048,
-            ),
-        )
-        for chunk in stream:
-            if chunk.text:
-                yield chunk.text
-    except Exception as e:
-        yield f"\\n\\n❌ **Помилка:** {str(e)}"
+    # Кнопки дій
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🗑️ Очистити", use_container_width=True):
+            st.session_state.messages = []
+            st.session_state.thread_id = str(uuid.uuid4())[:8]
+            # Скидаємо стан графа (пам'ять) через новий thread_id
+            st.rerun()
 
-# ============================================================
-# ФУНКЦІЯ ДЛЯ АГЕНТА
-# ============================================================
-def get_agent_response(prompt: str):
-    agent = get_langgraph_agent(api_key, MODEL_NAME)
-
-    # ВАЖЛИВО: thread_id потрібен для збереження/відновлення state між викликами
-    config = {"configurable": {"thread_id": st.session_state.thread_id}}
-
-    try:
-        result = agent.invoke(
-            {"messages": [HumanMessage(content=prompt)]},
-            config,
-        )
-        final_message = result["messages"][-1]
-        text = extract_response_text(final_message)
-        debug = extract_tools_debug(result["messages"])
-        return text, debug
-    except Exception as e:
-        return f"❌ **Помилка агента:** {str(e)}", []
-
-# ============================================================
-# ПРИВІТАННЯ
-# ============================================================
-if not st.session_state.messages:
-    with st.chat_message("assistant"):
-        if "Агент" in mode:
-            st.markdown(
-                f"""
-👋 Вітаю! Я AI-агент на базі **{MODEL_NAME}** з інструментами.
-
-Я можу:
-- 🧮 Обчислювати математичні вирази (через tool)
-- 📅 Повідомляти поточну дату та час (через tool)
-- 📚 Шукати інформацію у Wikipedia (через tool)
-
-Спробуйте: *"100/52"* або *"Хто такий Тарас Шевченко?"*
-"""
-            )
-        else:
-            st.markdown(
-                f"""
-👋 Вітаю! Я AI-асистент на базі **{MODEL_NAME}**.
-
-Просто напишіть повідомлення нижче!
-"""
+    with col2:
+        if st.session_state.get("messages"):
+            export_data = {
+                "exported_at": datetime.now().isoformat(),
+                "model": MODEL_NAME,
+                "thread_id": st.session_state.thread_id,
+                "monthly_limit": monthly_limit,
+                "expenses": expenses,
+                "messages": [str(m) for m in st.session_state.messages],
+            }
+            st.download_button(
+                "📥 Експорт",
+                data=json.dumps(export_data, ensure_ascii=False, indent=2),
+                file_name=f"finance_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                mime="application/json",
+                use_container_width=True,
             )
 
 # ============================================================
-# ВІДОБРАЖЕННЯ ІСТОРІЇ
+# РЕНДЕРІНГ ЧАТУ
 # ============================================================
+# Відображення історії повідомлень з session_state
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# ============================================================
-# ОБРОБКА ПОВІДОМЛЕННЯ
-# ============================================================
-if prompt := st.chat_input("Введіть ваше повідомлення..."):
-    st.session_state.messages.append({"role": "user", "content": prompt})
-
-    with st.chat_message("user"):
-        st.markdown(prompt)
+# Поле введення користувача
+if user_input := st.chat_input("Напишіть: 'Додай 250 грн на таксі' або 'Який мій ліміт?'"):
+    # Відображаємо повідомлення користувача
+    st.chat_message("user").markdown(user_input)
+    st.session_state.messages.append({"role": "user", "content": user_input})
 
     with st.chat_message("assistant"):
+        response_placeholder = st.empty()
+        debug_placeholder = st.empty()
+
         if "Агент" in mode:
-            with st.spinner("🤔 Агент думає..."):
-                response_text, debug = get_agent_response(prompt)
-            st.markdown(response_text)
-
-            if show_agent_debug and debug:
-                with st.expander("Debug: tool calls / results", expanded=False):
-                    st.json(debug)
-
-            response = response_text
-        else:
-            response = st.write_stream(
-                stream_gemini_response(prompt, st.session_state.messages[:-1])
+            # --- РОБОТА З LANGGRAPH АГЕНТОМ ---
+            config = {"configurable": {"thread_id": st.session_state.thread_id}}
+            
+            # Відправляємо репліку користувача в граф
+            events = agent.stream(
+                {"messages": [HumanMessage(content=user_input)]}, 
+                config, 
+                stream_mode="values"
             )
+            
+            final_message = None
+            all_messages = []
+            
+            # Читаємо стрім станів графа
+            for event in events:
+                if "messages" in event:
+                    all_messages = event["messages"]
+                    final_message = all_messages[-1]
+            
+            # Витягуємо текст відповіді моделі
+            ai_text = extract_response_text(final_message) if final_message else "Не вдалося отримати відповідь."
+            response_placeholder.markdown(ai_text)
+            
+            # Відображення Debug (інструментів), якщо потрібно
+            with st.sidebar:
+                show_debug = st.checkbox("Показувати дебаг інструментів", value=False)
+            if show_debug:
+                debug_info = extract_tools_debug(all_messages)
+                if debug_info:
+                    debug_placeholder.json(debug_info)
+            
+            st.session_state.messages.append({"role": "assistant", "content": ai_text})
+            
+            # Важливо: перезапускаємо сторінку, щоб sidebar миттєво оновив ліміти та прогрес-бар!
+            st.rerun()
 
-    if response:
-        st.session_state.messages.append({"role": "assistant", "content": response})
+        else:
+            # --- ЗВИЧАЙНИЙ РЕЖИМ (ФОЛБЕК БЕЗ ІНСТРУМЕНТІВ) ---
+            # Якщо ви захочете залишити прямий стрімінг без бази даних з вашого минулого коду:
+            from app import stream_gemini_response # Або реалізація функції нижче
+            
+            ai_text = ""
+            # Для простоти викликаємо звичайне генераційне вікно (як у вашому Кроці 7)
+            # Тут можна викликати `stream_gemini_response(user_input, ...)`
+            response_placeholder.markdown("Цей режим працює без збереження витрат.")
