@@ -4,6 +4,9 @@ import json
 import uuid
 from datetime import datetime
 
+import pandas as pd
+import altair as alt
+
 import streamlit as st
 from google import genai
 from google.genai import types
@@ -82,6 +85,25 @@ with st.sidebar:
     # 1. Віджет ліміту та прогресу
     st.metric(label="Поточний ліміт", value=f"{monthly_limit:.2f} грн")
     st.metric(label="Усього витрачено", value=f"{total_spent:.2f} грн")
+    # st.metric(label="Залишок", value=f"{monthly_limit - total_spent:.2f} грн")
+
+    # --- ЗАЛИШОК ---
+    remaining_budget = monthly_limit - total_spent
+    
+    # Якщо залишок позитивний — показуємо його зеленим, якщо негативний (овердрафт) — червоним
+    if remaining_budget >= 0:
+        delta_text = f"Доступно: {remaining_budget:.2f} грн"
+        delta_color = "normal"  # Зелений колір (позитивний баланс)
+    else:
+        delta_text = f"Перевищення на: {abs(remaining_budget):.2f} грн"
+        delta_color = "inverse" # Червоний колір (перевищення ліміту)
+        
+    st.metric(
+        label="Залишок", 
+        value=f"{remaining_budget:.2f} грн",
+        delta=delta_text,
+        delta_color=delta_color
+    )
     
     # Розрахунок прогресу для повзунка
     if monthly_limit > 0:
@@ -112,6 +134,36 @@ with st.sidebar:
             use_container_width=True,
             hide_index=True
         )
+
+        # 3. ДІАГРАМА ВИТРАТ ПО КАТЕГОРІЯХ
+        st.subheader("📊 Розподіл за категоріями")
+
+        # Перетворюємо список витрат у DataFrame для зручної груповки
+        df_expenses = pd.DataFrame(expenses)
+
+        # Групуємо за категоріями та сумуємо
+        df_chart = df_expenses.groupby("category", as_index=False)["amount"].sum()
+
+        # Створюємо красиву донат-діаграму (donut chart) через Altair
+        chart = (
+            alt.Chart(df_chart)
+            .mark_arc(innerRadius=35, stroke="#fff") # innerRadius робить з круга "пончик"
+            .encode(
+                theta=alt.Theta(field="amount", type="quantitative"),
+                color=alt.Color(field="category", type="nominal", legend=alt.Legend(title="Категорії")),
+                tooltip=[
+                    alt.Tooltip(field="category", title="Категорія"),
+                    alt.Tooltip(field="amount", title="Сума (грн)", format=".2f")
+                ]
+            )
+            .properties(height=200) # Компактна висота для бічної панелі
+        )
+
+        st.altair_chart(chart, use_container_width=True)
+
+        # МАЛЕНЬКА ПРИМІТКА ДЛЯ КОРИСТУВАЧА
+        st.caption("💡 *Підказка: наведіть курсор на сектор діаграми, щоб побачити точну суму витрат.*")
+
     else:
         st.caption("Немає записаних витрат.")
 
@@ -204,15 +256,15 @@ if user_input := st.chat_input("Напишіть: 'Додай 250 грн на т
             
             st.session_state.messages.append({"role": "assistant", "content": ai_text})
             
-            # Важливо: перезапускаємо сторінку, щоб sidebar миттєво оновив ліміти та прогрес-бар!
+            # Важливо: перезапускаємо сторінку, щоб sidebar миттєво оновив ліміти та прогрес-бар
             st.rerun()
 
         else:
             # --- ЗВИЧАЙНИЙ РЕЖИМ (ФОЛБЕК БЕЗ ІНСТРУМЕНТІВ) ---
-            # Якщо ви захочете залишити прямий стрімінг без бази даних з вашого минулого коду:
+            # залишити прямий стрімінг без бази даних:
             from app import stream_gemini_response # Або реалізація функції нижче
             
             ai_text = ""
-            # Для простоти викликаємо звичайне генераційне вікно (як у вашому Кроці 7)
+            # Для простоти викликаємо звичайне генераційне вікно 
             # Тут можна викликати `stream_gemini_response(user_input, ...)`
             response_placeholder.markdown("Цей режим працює без збереження витрат.")
