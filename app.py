@@ -85,7 +85,6 @@ with st.sidebar:
     # 1. Віджет ліміту та прогресу
     st.metric(label="Поточний ліміт", value=f"{monthly_limit:.2f} грн")
     st.metric(label="Усього витрачено", value=f"{total_spent:.2f} грн")
-    # st.metric(label="Залишок", value=f"{monthly_limit - total_spent:.2f} грн")
 
     # --- ЗАЛИШОК ---
     remaining_budget = monthly_limit - total_spent
@@ -104,6 +103,32 @@ with st.sidebar:
         delta=delta_text,
         delta_color=delta_color
     )
+
+    # --- НАЙБІЛЬША КАТЕГОРІЯ ---
+    top_category_name = "Немає"
+    top_category_value = 0.0
+
+    if expenses:
+        # Створюємо словник для підрахунку суми по кожній категорії
+        cat_totals = {}
+        for e in expenses:
+            cat = e.get("category", "інше").strip().capitalize()
+            cat_totals[cat] = cat_totals.get(cat, 0.0) + float(e.get("amount", 0))
+        
+        # Знаходимо категорію з максимальною сумою
+        if cat_totals:
+            top_category_name = max(cat_totals, key=cat_totals.get)
+            top_category_value = cat_totals[top_category_name]
+
+    st.metric(
+        label="Найбільша категорія", 
+        value=top_category_name,
+        delta=f"Витрачено: {top_category_value:.2f} грн" if top_category_value > 0 else "0.00 грн",
+        delta_color="off" # Вимикаємо зелений/червоний колір для дельти, робимо її нейтрально сірою
+    )
+    # ----------------------------------------
+
+    st.divider()
     
     # Розрахунок прогресу для повзунка
     if monthly_limit > 0:
