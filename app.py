@@ -145,12 +145,36 @@ with st.sidebar:
 
     st.divider()
     
-    # 2. Таблиця з останніми транзакціями
-    st.subheader("📝 Останні витрати")
+
+    # 2. ТАБЛИЦЯ ТА ДІАГРАМА З ФІЛЬТРАЦІЄЮ
     if expenses:
-        # Показуємо останні 5 витрат для компактності
+        st.subheader("📝 Мої транзакції")
+        
+        # Перетворюємо список витрат у DataFrame
+        df_expenses = pd.DataFrame(expenses)
+        # Приводимо категорії до красивого вигляду (з великої літери)
+        df_expenses["category"] = df_expenses["category"].str.strip().str.capitalize()
+        
+        # Створюємо список унікальних категорій для фільтра + варіант "Усі"
+        unique_categories = ["Усі категорії"] + sorted(df_expenses["category"].unique().tolist())
+        
+        # Віджет вибору категорії
+        selected_category = st.selectbox(
+            "Фільтр за категорією:",
+            options=unique_categories,
+            index=0
+        )
+        
+        # Фільтруємо DataFrame відповідно до вибору користувача
+        if selected_category == "Усі категорії":
+            df_filtered = df_expenses
+        else:
+            df_filtered = df_expenses[df_expenses["category"] == selected_category]
+            
+        # Відображаємо відфільтровану таблицю (останні 5 записів)
+        st.caption(f"Показано: {selected_category}")
         st.dataframe(
-            expenses[::-1][:5], 
+            df_filtered[::-1][:5], 
             column_config={
                 "amount": "Сума (грн)",
                 "category": "Категорія",
@@ -159,20 +183,16 @@ with st.sidebar:
             use_container_width=True,
             hide_index=True
         )
-
-        # 3. ДІАГРАМА ВИТРАТ ПО КАТЕГОРІЯХ
-        st.subheader("📊 Розподіл за категоріями")
-
-        # Перетворюємо список витрат у DataFrame для зручної груповки
-        df_expenses = pd.DataFrame(expenses)
-
-        # Групуємо за категоріями та сумуємо
-        df_chart = df_expenses.groupby("category", as_index=False)["amount"].sum()
-
-        # Створюємо красиву донат-діаграму (donut chart) через Altair
+        
+        # 3. Діаграма витрат (теж реагує на фільтр)
+        st.subheader("📊 Розподіл")
+        
+        # Групуємо відфільтровані дані
+        df_chart = df_filtered.groupby("category", as_index=False)["amount"].sum()
+        
         chart = (
             alt.Chart(df_chart)
-            .mark_arc(innerRadius=35, stroke="#fff") # innerRadius робить з круга "пончик"
+            .mark_arc(innerRadius=35, stroke="#fff")
             .encode(
                 theta=alt.Theta(field="amount", type="quantitative"),
                 color=alt.Color(field="category", type="nominal", legend=alt.Legend(title="Категорії")),
@@ -181,7 +201,7 @@ with st.sidebar:
                     alt.Tooltip(field="amount", title="Сума (грн)", format=".2f")
                 ]
             )
-            .properties(height=200) # Компактна висота для бічної панелі
+            .properties(height=200)
         )
 
         st.altair_chart(chart, use_container_width=True)
