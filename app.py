@@ -245,6 +245,21 @@ with st.sidebar:
         key="mode_radio",
     )
 
+    # Налаштування температури для звичайного чату
+    temperature = st.slider(
+        "Температура (звичайний чат)",
+        min_value=0.0, max_value=1.0, value=0.7, step=0.1,
+        key="temperature_slider"
+    )
+
+    with st.expander("📝 Системний промпт (чат)"):
+        sys_prompt_input = st.text_area("Інструкції", value=st.session_state.system_prompt, height=100)
+        if st.button("💾 Зберегти", use_container_width=True):
+            st.session_state.system_prompt = sys_prompt_input.strip()
+            st.toast("Промпт оновлено!")
+
+    st.divider()
+
     # Кнопки дій
     col1, col2 = st.columns(2)
     with col1:
@@ -273,66 +288,151 @@ with st.sidebar:
             )
 
 # ============================================================
-# РЕНДЕРІНГ ЧАТУ
+# ФУНКЦІЇ ДЛЯ ЗВИЧАЙНОГО РЕЖИМУ (СТРІМІНГ GEMINI)
 # ============================================================
-# Відображення історії повідомлень з session_state
+def convert_to_gemini_history(messages: list) -> list[types.Content]:
+    contents = []
+    for msg in messages:
+        if msg["role"] not in ["user", "assistant"]:
+            continue
+        role = "user" if msg["role"] == "user" else "model"
+        contents.append(
+            types.Content(role=role, parts=[types.Part.from_text(text=msg["content"])])
+        )
+    return contents
+
+def stream_gemini_response(prompt: str, history: list, system_prompt: str):
+    client = get_gemini_client(api_key)
+    contents = convert_to_gemini_history(history)
+    contents.append(types.Content(role="user", parts=[types.Part.from_text(text=prompt)]))
+
+    try:
+        stream = client.models.generate_content_stream(
+            model=MODEL_NAME,
+            contents=contents,
+            config=types.GenerateContentConfig(
+                system_instruction=system_prompt,
+                temperature=temperature,
+                max_output_tokens=2048,
+            ),
+        )
+        for chunk in stream:
+            if chunk.text:
+                yield chunk.text
+    except Exception as e:
+        yield f"\n\n❌ **Помилка API:** {str(e)}"
+
+# ============================================================
+# РЕНДЕРІНГ ТА ОБРОБКА ЧАТУ
+# ============================================================
+# Відображаємо історію
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# Поле введення користувача
-if user_input := st.chat_input("Напишіть: 'Додай 250 грн на таксі' або 'Який мій ліміт?'"):
-    # Відображаємо повідомлення користувача
+# Нове повідомлення від користувача
+if user_input := st.chat_input("Введіть запит..."):
     st.chat_message("user").markdown(user_input)
     st.session_state.messages.append({"role": "user", "content": user_input})
 
     with st.chat_message("assistant"):
         response_placeholder = st.empty()
-        debug_placeholder = st.empty()
-
+        
+        # --- РОЗГАЛУЖЕННЯ РЕЖИМІВ ЗАВДЯКИ СЕЛЕКТОРУ ---
         if "Агент" in mode:
-            # --- РОБОТА З LANGGRAPH АГЕНТОМ ---
+            # 🚀 РЕЖИМ №1: LANGGRAPH АГЕНТ
             config = {"configurable": {"thread_id": st.session_state.thread_id}}
-            
-            # Відправляємо репліку користувача в граф
-            events = agent.stream(
-                {"messages": [HumanMessage(content=user_input)]}, 
-                config, 
-                stream_mode="values"
-            )
+            events = agent.stream({"messages": [HumanMessage(content=user_input)]}, config, stream_mode="values")
             
             final_message = None
             all_messages = []
-            
-            # Читаємо стрім станів графа
             for event in events:
                 if "messages" in event:
                     all_messages = event["messages"]
                     final_message = all_messages[-1]
             
-            # Витягуємо текст відповіді моделі
-            ai_text = extract_response_text(final_message) if final_message else "Не вдалося отримати відповідь."
+            ai_text = extract_response_text(final_message) if final_message else "Помилка відповіді графа."
             response_placeholder.markdown(ai_text)
-            
-            # Відображення Debug (інструментів), якщо потрібно
-            with st.sidebar:
-                show_debug = st.checkbox("Показувати дебаг інструментів", value=False)
-            if show_debug:
-                debug_info = extract_tools_debug(all_messages)
-                if debug_info:
-                    debug_placeholder.json(debug_info)
-            
             st.session_state.messages.append({"role": "assistant", "content": ai_text})
-            
-            # Важливо: перезапускаємо сторінку, щоб sidebar миттєво оновив ліміти та прогрес-бар
             st.rerun()
 
         else:
-            # --- ЗВИЧАЙНИЙ РЕЖИМ (ФОЛБЕК БЕЗ ІНСТРУМЕНТІВ) ---
-            # залишити прямий стрімінг без бази даних:
-            from app import stream_gemini_response # Або реалізація функції нижче
-            
+            # 💬 РЕЖИМ №2: ЗВИЧАЙНИЙ ЧАТ (Стрімінг з урахуванням кастомного Системного промпту)
             ai_text = ""
-            # Для простоти викликаємо звичайне генераційне вікно 
-            # Тут можна викликати `stream_gemini_response(user_input, ...)`
-            response_placeholder.markdown("Цей режим працює без збереження витрат.")
+            response_stream = stream_gemini_response(
+                prompt=user_input, 
+                history=st.session_state.messages[:-1], 
+                system_prompt=st.session_state.system_prompt  # Передаємо збережений промпт
+            )
+            
+            for chunk in response_stream:
+                ai_text += chunk
+                response_placeholder.markdown(ai_text + "▌")
+            
+            response_placeholder.markdown(ai_text)
+            st.session_state.messages.append({"role": "assistant", "content": ai_text})
+
+# # ============================================================
+# # РЕНДЕРІНГ ЧАТУ
+# # ============================================================
+# # Відображення історії повідомлень з session_state
+# for message in st.session_state.messages:
+#     with st.chat_message(message["role"]):
+#         st.markdown(message["content"])
+
+# # Поле введення користувача
+# if user_input := st.chat_input("Напишіть: 'Додай 250 грн на таксі' або 'Який мій ліміт?'"):
+#     # Відображаємо повідомлення користувача
+#     st.chat_message("user").markdown(user_input)
+#     st.session_state.messages.append({"role": "user", "content": user_input})
+
+#     with st.chat_message("assistant"):
+#         response_placeholder = st.empty()
+#         debug_placeholder = st.empty()
+
+#         if "Агент" in mode:
+#             # --- РОБОТА З LANGGRAPH АГЕНТОМ ---
+#             config = {"configurable": {"thread_id": st.session_state.thread_id}}
+            
+#             # Відправляємо репліку користувача в граф
+#             events = agent.stream(
+#                 {"messages": [HumanMessage(content=user_input)]}, 
+#                 config, 
+#                 stream_mode="values"
+#             )
+            
+#             final_message = None
+#             all_messages = []
+            
+#             # Читаємо стрім станів графа
+#             for event in events:
+#                 if "messages" in event:
+#                     all_messages = event["messages"]
+#                     final_message = all_messages[-1]
+            
+#             # Витягуємо текст відповіді моделі
+#             ai_text = extract_response_text(final_message) if final_message else "Не вдалося отримати відповідь."
+#             response_placeholder.markdown(ai_text)
+            
+#             # Відображення Debug (інструментів), якщо потрібно
+#             with st.sidebar:
+#                 show_debug = st.checkbox("Показувати дебаг інструментів", value=False)
+#             if show_debug:
+#                 debug_info = extract_tools_debug(all_messages)
+#                 if debug_info:
+#                     debug_placeholder.json(debug_info)
+            
+#             st.session_state.messages.append({"role": "assistant", "content": ai_text})
+            
+#             # Важливо: перезапускаємо сторінку, щоб sidebar миттєво оновив ліміти та прогрес-бар
+#             st.rerun()
+
+#         else:
+#             # --- ЗВИЧАЙНИЙ РЕЖИМ (ФОЛБЕК БЕЗ ІНСТРУМЕНТІВ) ---
+#             # залишити прямий стрімінг без бази даних:
+#             from app import stream_gemini_response # Або реалізація функції нижче
+            
+#             ai_text = ""
+#             # Для простоти викликаємо звичайне генераційне вікно 
+#             # Тут можна викликати `stream_gemini_response(user_input, ...)`
+#             response_placeholder.markdown("Цей режим працює без збереження витрат.")
