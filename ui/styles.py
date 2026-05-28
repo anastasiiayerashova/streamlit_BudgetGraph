@@ -13,8 +13,13 @@ def apply_page_config ():
 st.markdown(
     """
     <style>
-    html, body, [class*="css"]  {
-        font-family: 'Nunito', monospace !important;
+
+    /* Імпортуємо Nunito прямо в сесію браузера */
+    @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700&display=swap');
+
+    /* Застосовуємо шрифт до всіх елементів інтерфейсу */
+    html, body, [class*="css"], .stApp, div, span, p, h1, h2, h3, h4, h5, h6, label {
+        font-family: 'Nunito', sans-serif !important;
     }
     
     /* Зміна фону самого вікна, де відображається чат */
