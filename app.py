@@ -277,6 +277,10 @@ with st.sidebar:
         st.info("💡 Тут з'являться ваші витрати, коли ви додасте перший запис.")
 
     st.divider()
+
+    st.info(f"Модель: **{MODEL_NAME}**")
+
+    st.divider()
     
     # Налаштування режиму чату
     mode = st.radio(
