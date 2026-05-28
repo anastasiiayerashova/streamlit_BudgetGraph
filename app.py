@@ -35,7 +35,7 @@ st.markdown(
     """
     <style>
     html, body, [class*="css"]  {
-        font-family: 'Comfortaa', sans-serif; 
+        font-family: 'Calibri', sans-serif; 
     }
     
     /* Зміна фону самого вікна, де відображається чат */
@@ -100,6 +100,17 @@ expenses = graph_state.values.get("expenses", []) if graph_state.values else []
 monthly_limit = graph_state.values.get("monthly_limit", 10000.0) if graph_state.values else 10000.0
 total_spent = sum(float(e.get("amount", 0)) for e in expenses)
 
+# --- РОЗРАХУНОК ПРОГНОЗУ НА КІНЕЦЬ МІСЯЦЯ ---
+import calendar
+now = datetime.now()
+current_day = now.day
+total_days_in_month = calendar.monthrange(now.year, now.month)[1]
+
+# Рахуємо середнє за день. Якщо місяць тільки почався і день 1, ділимо на 1
+avg_per_day = total_spent / current_day if current_day > 0 else 0
+predicted_spent = avg_per_day * total_days_in_month
+# ---------------------------------------------
+
 # ============================================================
 # UI: ЗАГОЛОВОК
 # ============================================================
@@ -133,6 +144,25 @@ with st.sidebar:
         delta=delta_text,
         delta_color=delta_color
     )
+
+    # --- НОВИЙ БЛОК: ПРОГНОЗУВАННЯ ВИТРАТ ---
+    # Обчислюємо різницю між лімітом та прогнозом
+    prediction_delta = monthly_limit - predicted_spent
+    
+    if prediction_delta >= 0:
+        pred_text = f"Вкладаєтесь у ліміт (запас {prediction_delta:.2f} грн)"
+        pred_color = "normal"   # Зелений колір
+    else:
+        pred_text = f"Ризик перевищення на {abs(prediction_delta):.2f} грн!"
+        pred_color = "inverse"  # Червоний колір
+
+    st.metric(
+        label="Прогноз на кінець місяця",
+        value=f"{predicted_spent:.2f} грн",
+        delta=pred_text,
+        delta_color=pred_color
+    )
+    # ----------------------------------------
 
     # --- НАЙБІЛЬША КАТЕГОРІЯ ---
     top_category_name = "Немає"
