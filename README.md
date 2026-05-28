@@ -107,14 +107,15 @@
 
 ## 📂 Структура проєкту
 
+```text
 ├── .streamlit/
-│ └── secrets.toml # Токени доступу (API ключі)
+│   └── secrets.toml          # Токени доступу (API ключі)
 ├── ui/
-│ ├── styles.py # Кастомні стилі сторінки Streamlit
-├── app.py # Головний файл інтерфейсу та логіки UI Streamlit
-├── agent.py # Опис архітектури LangGraph, вузлів та інструментів
-├── README.md # Документація проєкту
-└── requirements.txt # Список залежностей проєкту
+│   └── styles.py             # Кастомні стилі сторінки Streamlit
+├── app.py                    # Головний файл інтерфейсу та логіки UI Streamlit
+├── agent.py                  # Опис архітектури LangGraph, вузлів та інструментів
+├── README.md                 # Документація проєкту
+└── requirements.txt          # Список залежностей проєкту
 
 ---
 
@@ -136,9 +137,9 @@
 
 **Anastasiia Yerashova** — Junior Full-Stack Developer passionate about writing clean and efficient code, growing professionally, and collaborating with purpose-driven teams.
 
-> "As a passionate Junior Full-Stack Developer, I excel at delivering clean, reliable, and efficient solutions.  
-> My goal is to grow professionally, achieve meaningful results, and work with people who share my drive for success.  
-> I approach every task with responsibility and dedication, always giving 100%.  
+> "As a passionate Junior Full-Stack Developer, I excel at delivering clean, reliable, and efficient solutions.
+> My goal is to grow professionally, achieve meaningful results, and work with people who share my drive for success.
+> I approach every task with responsibility and dedication, always giving 100%.
 > My ability to quickly adapt to new challenges and technologies allows me to thrive in agile and fast-paced environments."
 
 ## 📫 Contact
@@ -148,3 +149,4 @@
 - Email: yerashova.a@gmail.com
 
 > Thank you for checking out the project! If you found it helpful or interesting, feel free to leave a ⭐ on the repository.
+```
