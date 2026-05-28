@@ -1,7 +1,9 @@
-# app.py — Чатбот-асистент фінансового обліку (Gemini + LangGraph)
+# app.py - Чатбот-асистент фінансового обліку (Gemini + LangGraph)
 
 import json
 import uuid
+import calendar
+import io
 from datetime import datetime
 
 import pandas as pd
@@ -11,9 +13,10 @@ import streamlit as st
 from google import genai
 from google.genai import types
 
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage
 
-# Імпортуємо агента
+from ui.styles import apply_page_config
+
 from agent import (
     create_agent,
     extract_response_text,
@@ -21,54 +24,18 @@ from agent import (
     MODEL_NAME,
 )
 
+
 # ============================================================
 # НАЛАШТУВАННЯ СТОРІНКИ
 # ============================================================
-st.set_page_config(
-    page_title="Фінансовий AI-Асистент",
-    page_icon="💸",
-    layout="centered",
-    initial_sidebar_state="expanded",
-)
 
-st.markdown(
-    """
-    <style>
-    html, body, [class*="css"]  {
-        font-family: 'Nunito', monospace !important;
-    }
-    
-    /* Зміна фону самого вікна, де відображається чат */
-    .stChatMessage {
-        background-color: #e6e6fa !important; /*  фон для блоків повідомлень */
-        border-radius: 12px;
-        margin-bottom: 10px;
-    }
+apply_page_config()
 
-    /* Зміна фону всього зовнішнього контейнера інпуту */
-    [data-testid="stChatInput"] {
-        background-color: #ede6fa !important; 
-        border-radius: 14px !important;       
-        padding: 4px !important;
-    }
-
-    [data-testid=stSidebar] {
-        background-color: #ede6fa;
-        font-family: 'Nunito', monospace !important;
-    }
-    
-    /* Повідомлення асистента */
-    [data-testid="stChatMessageAssistant"] {
-        background-color: #e8f1f5 !important; /* Ніжно-блакитний для бота */
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
 
 # ============================================================
 # ІНІЦІАЛІЗАЦІЯ
 # ============================================================
+
 @st.cache_resource
 def get_gemini_client(api_key: str):
     return genai.Client(api_key=api_key)
@@ -84,9 +51,11 @@ if not api_key:
 
 agent = get_langgraph_agent(api_key, MODEL_NAME)
 
+
 # ============================================================
 # СТАН STREAMLIT
 # ============================================================
+
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -96,13 +65,10 @@ if "thread_id" not in st.session_state:
 if "system_prompt" not in st.session_state:
     st.session_state.system_prompt = "Ти корисний фінансовий асистент. Відповідай українською мовою."
 
-# --------------------------------------------------------
-# Сховище для дебагу поточної репліки
-# --------------------------------------------------------
 if "current_debug" not in st.session_state:
     st.session_state.current_debug = None
 
-# Отримуємо ПЛИННИЙ СТАН графа LangGraph (для лімітів та витрат)
+# Отримуємо стан графа (для лімітів та витрат)
 config = {"configurable": {"thread_id": st.session_state.thread_id}}
 graph_state = agent.get_state(config)
 
@@ -111,8 +77,11 @@ expenses = graph_state.values.get("expenses", []) if graph_state.values else []
 monthly_limit = graph_state.values.get("monthly_limit", 10000.0) if graph_state.values else 10000.0
 total_spent = sum(float(e.get("amount", 0)) for e in expenses)
 
-# --- РОЗРАХУНОК ПРОГНОЗУ НА КІНЕЦЬ МІСЯЦЯ ---
-import calendar
+
+# ============================================================
+# РОЗРАХУНОК ПРОГНОЗУ НА КІНЕЦЬ МІСЯЦЯ 
+# ============================================================
+
 now = datetime.now()
 current_day = now.day
 total_days_in_month = calendar.monthrange(now.year, now.month)[1]
@@ -120,34 +89,40 @@ total_days_in_month = calendar.monthrange(now.year, now.month)[1]
 # Рахуємо середнє за день. Якщо місяць тільки почався і день 1, ділимо на 1
 avg_per_day = total_spent / current_day if current_day > 0 else 0
 predicted_spent = avg_per_day * total_days_in_month
-# ---------------------------------------------
+
 
 # ============================================================
 # UI: ЗАГОЛОВОК
 # ============================================================
+
 st.title("💸 AI-Асистент Особистих Фінансів")
 st.write("Керуйте бюджетом голосом чи текстом: додавайте витрати, встановлюйте ліміти та запитуйте аналітику.")
+
 
 # ============================================================
 # UI: БІЧНА ПАНЕЛЬ (МОНІТОРИНГ БЮДЖЕТУ)
 # ============================================================
+
 with st.sidebar:
     st.header("📊 Мій Бюджет")
     
-    # 1. Віджет ліміту та прогресу
+    # 1. Віджет ліміту та витрат
     st.metric(label="Поточний ліміт", value=f"{monthly_limit:.2f} грн")
     st.metric(label="Усього витрачено", value=f"{total_spent:.2f} грн")
 
-    # --- ЗАЛИШОК ---
+
+# ----------------------------------------------------------- #
+
+
+    # 2. Віджет залишку бюджету з кольоровою індикацією
     remaining_budget = monthly_limit - total_spent
     
-    # Якщо залишок позитивний — показуємо його зеленим, якщо негативний (овердрафт) — червоним
     if remaining_budget >= 0:
         delta_text = f"Доступно: {remaining_budget:.2f} грн"
-        delta_color = "normal"  # Зелений колір (позитивний баланс)
+        delta_color = "normal"  
     else:
         delta_text = f"Перевищення на: {abs(remaining_budget):.2f} грн"
-        delta_color = "inverse" # Червоний колір (перевищення ліміту)
+        delta_color = "inverse" 
         
     st.metric(
         label="Залишок", 
@@ -156,16 +131,19 @@ with st.sidebar:
         delta_color=delta_color
     )
 
-    # --- ПРОГНОЗУВАННЯ ВИТРАТ ---
-    # Обчислюємо різницю між лімітом та прогнозом
+
+# ----------------------------------------------------------- #
+    
+
+    # 3. Прогноз на кінець місяця з кольоровою індикацією ризику перевищення
     prediction_delta = monthly_limit - predicted_spent
     
     if prediction_delta >= 0:
         pred_text = f"Вкладаєтесь у ліміт (запас {prediction_delta:.2f} грн)"
-        pred_color = "normal"   # Зелений колір
+        pred_color = "normal"  
     else:
         pred_text = f"Ризик перевищення на {abs(prediction_delta):.2f} грн!"
-        pred_color = "inverse"  # Червоний колір
+        pred_color = "inverse"  
 
     st.metric(
         label="Прогноз на кінець місяця",
@@ -173,9 +151,12 @@ with st.sidebar:
         delta=pred_text,
         delta_color=pred_color
     )
-    # ----------------------------------------
 
-    # --- НАЙБІЛЬША КАТЕГОРІЯ ---
+
+# ----------------------------------------------------------- #
+    
+
+    # 4. Віджет найбільшої категорії витрат
     top_category_name = "Немає"
     top_category_value = 0.0
 
@@ -197,16 +178,19 @@ with st.sidebar:
         delta=f"Витрачено: {top_category_value:.2f} грн" if top_category_value > 0 else "0.00 грн",
         delta_color="off" # Вимикаємо зелений/червоний колір для дельти, робимо її нейтрально сірою
     )
-    # ----------------------------------------
+
 
     st.divider()
+
+
+# ----------------------------------------------------------- #
     
-    # Розрахунок прогресу для повзунка
+
+    # 5. Прогрес-бар для візуалізації використання бюджету
     if monthly_limit > 0:
         progress_ratio = min(total_spent / monthly_limit, 1.0)
         st.progress(progress_ratio)
         
-        # Попередження про перевищення
         if total_spent >= monthly_limit:
             st.error("🚨 Ліміт бюджету вичерпано чи перевищено!")
         elif total_spent >= monthly_limit * 0.8:
@@ -214,16 +198,19 @@ with st.sidebar:
     else:
         st.info("Ліміт не встановлено або дорівнює 0.")
 
+
     st.divider()
+
+
+# ----------------------------------------------------------- #
     
 
-    # 2. ТАБЛИЦЯ ТА ДІАГРАМА З ФІЛЬТРАЦІЄЮ
+    # 6. Таблиця останніх транзакцій з фільтром за категорією
     if expenses:
         st.subheader("📝 Мої транзакції")
         
         # Перетворюємо список витрат у DataFrame
         df_expenses = pd.DataFrame(expenses)
-        # Приводимо категорії до красивого вигляду (з великої літери)
         df_expenses["category"] = df_expenses["category"].str.strip().str.capitalize()
         
         # Створюємо список унікальних категорій для фільтра + варіант "Усі"
@@ -254,8 +241,12 @@ with st.sidebar:
             use_container_width=True,
             hide_index=True
         )
+
         
-        # 3. Діаграма витрат (теж реагує на фільтр)
+# ----------------------------------------------------------- #
+
+
+        # 7. Діаграма витрат (теж реагує на фільтр)
         st.subheader("📊 Розподіл")
         
         # Групуємо відфільтровані дані
@@ -282,13 +273,24 @@ with st.sidebar:
     else:
         st.info("💡 Тут з'являться ваші витрати, коли ви додасте перший запис.")
 
+
     st.divider()
 
+
+# ----------------------------------------------------------- #
+
+
+    # 8. Інформація про модель 
     st.info(f"Модель: **{MODEL_NAME}**")
 
+
     st.divider()
+
+
+# ----------------------------------------------------------- #
+
     
-    # Налаштування режиму чату
+    # 9. Налаштування режиму чату
     mode = st.radio(
         "Режим роботи",
         ["🛠️ Агент з інструментами", "💬 Звичайний чат (без БД)"],
@@ -296,36 +298,52 @@ with st.sidebar:
         key="mode_radio",
     )
 
-    # Налаштування температури для звичайного чату
+
+# ----------------------------------------------------------- #
+
+
+    # 10. Налаштування температури для звичайного чату
     temperature = st.slider(
         "Температура (звичайний чат)",
         min_value=0.0, max_value=1.0, value=0.7, step=0.1,
         key="temperature_slider"
     )
 
-    # --------------------------------------------------------
-    # Чекбокс для дебагу
-    # --------------------------------------------------------
+    
+# ----------------------------------------------------------- #
+
+
+    # 11. Чекбокс для дебагу 
     show_agent_debug = False
     if "Агент" in mode:
         show_agent_debug = st.checkbox("🔍 Показувати дебаг інструментів", value=False)
-    # --------------------------------------------------------
+    
 
+# ----------------------------------------------------------- #
+
+
+    # 12. Редактор системного промпту
     with st.expander("📝 Системний промпт (чат)"):
         sys_prompt_input = st.text_area("Інструкції", value=st.session_state.system_prompt, height=100)
         if st.button("💾 Зберегти", use_container_width=True):
             st.session_state.system_prompt = sys_prompt_input.strip()
             st.toast("Промпт оновлено!")
 
+
     st.divider()
 
-    # Кнопки дій
+
+# ----------------------------------------------------------- #
+
+
+    # 13. Кнопки дій
     col1, col2 = st.columns(2)
+
     with col1:
         if st.button("🗑️ Очистити", use_container_width=True):
             st.session_state.messages = []
             st.session_state.thread_id = str(uuid.uuid4())[:8]
-            # Скидаємо стан графа (пам'ять) через новий thread_id
+            # Скидаємо стан графа (пам'ять) 
             st.rerun()
 
     with col2:
@@ -346,13 +364,13 @@ with st.sidebar:
                 use_container_width=True,
             )
 
+
             # --------------------------------------------------------
-            # Експорт у Excel через openpyxl
+            # ЕКСПОРТ В EXCEL 
             # --------------------------------------------------------
+
             if expenses:
-                import io
                 
-                # Конвертуємо список транзакцій у DataFrame та робимо гарні назви колонок
                 df_to_excel = pd.DataFrame(expenses)
                 
                 # Перейменовуємо та впорядковуємо колонки 
@@ -383,9 +401,11 @@ with st.sidebar:
                     use_container_width=True,
                 )
 
+
 # ============================================================
 # ФУНКЦІЇ ДЛЯ ЗВИЧАЙНОГО РЕЖИМУ (СТРІМІНГ GEMINI)
 # ============================================================
+
 def convert_to_gemini_history(messages: list) -> list[types.Content]:
     contents = []
     for msg in messages:
@@ -396,6 +416,10 @@ def convert_to_gemini_history(messages: list) -> list[types.Content]:
             types.Content(role=role, parts=[types.Part.from_text(text=msg["content"])])
         )
     return contents
+
+
+# ----------------------------------------------------------- #
+
 
 def stream_gemini_response(prompt: str, history: list, system_prompt: str):
     client = get_gemini_client(api_key)
@@ -415,26 +439,34 @@ def stream_gemini_response(prompt: str, history: list, system_prompt: str):
         for chunk in stream:
             if chunk.text:
                 yield chunk.text
+
     except Exception as e:
         yield f"\n\n❌ **Помилка API:** {str(e)}"
+
 
 # ============================================================
 # РЕНДЕРІНГ ТА ОБРОБКА ЧАТУ
 # ============================================================
-# Відображаємо історію
+
+# 1. Відображаємо історію
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# --------------------------------------------------------
-# НОВИЙ БЛОК: Виводимо збережений дебаг під останнім повідомленням
-# --------------------------------------------------------
+
+# ----------------------------------------------------------- #
+
+
+# 2. Виводимо збережений дебаг під останнім повідомленням
 if "Агент" in mode and show_agent_debug and st.session_state.get("current_debug"):
     with st.expander("🛠️ Дебаг: виклики інструментів", expanded=False):
         st.json(st.session_state.current_debug)
-# --------------------------------------------------------
 
-# Нове повідомлення від користувача
+
+# ----------------------------------------------------------- #
+
+
+# 3. Обробляємо новий ввід користувача
 if user_input := st.chat_input("Введіть запит..."):
     st.chat_message("user").markdown(user_input)
     st.session_state.messages.append({"role": "user", "content": user_input})
@@ -442,9 +474,9 @@ if user_input := st.chat_input("Введіть запит..."):
     with st.chat_message("assistant"):
         response_placeholder = st.empty()
         
-        # --- РОЗГАЛУЖЕННЯ РЕЖИМІВ ЗАВДЯКИ СЕЛЕКТОРУ ---
+        # Розгалуження на два режими 
         if "Агент" in mode:
-            # 🚀 РЕЖИМ №1: LANGGRAPH АГЕНТ
+            # Режим №1: Агент
             config = {"configurable": {"thread_id": st.session_state.thread_id}}
             events = agent.stream({"messages": [HumanMessage(content=user_input)]}, config, stream_mode="values")
             
@@ -459,20 +491,21 @@ if user_input := st.chat_input("Введіть запит..."):
             response_placeholder.markdown(ai_text)
             st.session_state.messages.append({"role": "assistant", "content": ai_text})
 
-            # --------------------------------------------------------
-            # ОНОВЛЕНО: Зберігаємо дебаг в сесію перед тим, як перезапустити сторінку
-            # --------------------------------------------------------
+
+# ----------------------------------------------------------- #
+
+
+            # 4. Зберігаємо дебаг в сесію перед тим, як перезапустити сторінку
             if all_messages:
                 debug_info = extract_tools_debug(all_messages)
                 st.session_state.current_debug = debug_info if debug_info else None
             else:
                 st.session_state.current_debug = None
-            # --------------------------------------------------------
 
             st.rerun()
 
         else:
-            # 💬 РЕЖИМ №2: ЗВИЧАЙНИЙ ЧАТ (Стрімінг з урахуванням кастомного системного промпту)
+            # Режим №2: Звичайний чат (стрімінг відповіді)
             ai_text = ""
             response_stream = stream_gemini_response(
                 prompt=user_input, 
@@ -486,4 +519,3 @@ if user_input := st.chat_input("Введіть запит..."):
             
             response_placeholder.markdown(ai_text)
             st.session_state.messages.append({"role": "assistant", "content": ai_text})
-

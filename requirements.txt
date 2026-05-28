@@ -4,5 +4,5 @@ langgraph
 langchain
 langchain-google-genai
 langchain-community
-wikipedia
-numexpr
+altair
+openpyxl

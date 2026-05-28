@@ -1,4 +1,4 @@
-# agent.py — LangGraph-агент з фінансовими інструментами (Gemini)
+# agent.py - LangGraph-агент з фінансовими інструментами (Gemini)
 
 from __future__ import annotations
 
@@ -17,14 +17,18 @@ from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
 from langgraph.checkpoint.memory import InMemorySaver
 
+
 # ============================================================
 # КОНСТАНТИ
 # ============================================================
+
 MODEL_NAME = "gemini-2.5-flash"
+
 
 # ============================================================
 # СХЕМА СТАНУ
 # ============================================================
+
 def add_expenses(prev: List[Dict], new: List[Dict]) -> List[Dict]:
     return (prev or []) + (new or [])
 
@@ -33,9 +37,11 @@ class AgentState(TypedDict):
     expenses: Annotated[list[dict], add_expenses] # База даних витрат користувача
     monthly_limit: float                          # Ліміт бюджету
 
+
 # ============================================================
 # ІНСТРУМЕНТИ
 # ============================================================
+
 @tool
 def add_expense(amount: float, category: str, description: str) -> dict:
     """
@@ -69,9 +75,11 @@ def set_limit_tool(new_limit: float) -> str:
 
 TOOLS = [add_expense, total_spent, summary_by_category, set_limit_tool]
 
+
 # ============================================================
 # ВУЗЛИ ТА ЛОГІКА ГРАФА
 # ============================================================
+
 def custom_tool_node(state: AgentState):
     """Кастомний вузол для виконання інструментів та синхронізації зі State"""
     last_msg = state["messages"][-1]
@@ -155,9 +163,11 @@ def router(state: AgentState):
             
     return END
 
+
 # ============================================================
 # ГОЛОВНА ФУНКЦІЯ СТВОРЕННЯ АГЕНТА
 # ============================================================
+
 def create_agent(api_key: str, model_name: str = MODEL_NAME):
     """
     Створює скомпільований LangGraph-агент фінансового обліку.
