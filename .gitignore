@@ -15,7 +15,6 @@ dist/
 .env.local
 .env.*.local
 .streamlit/secrets.toml
-.streamlit/config.toml
 
 # --- Logs ---
 *.log
