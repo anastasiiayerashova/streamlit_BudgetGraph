@@ -80,6 +80,7 @@ git clone [https://github.com/anastasiiayerashova/streamlit_BudgetGraph](https:/
 ### 2. Встановлення залежностей
 ```bash
 pip install -r requirements.txt
+```
 
 ### 3. Налаштування API Ключа
 
@@ -88,16 +89,16 @@ pip install -r requirements.txt
 ```bash
 mkdir .streamlit
 touch .streamlit/secrets.toml
-
+```
 Додайте туди свій ключ від Google AI Studio:
 
 ```bash
 GOOGLE_API_KEY = "ваш_api_ключ_gemini"
-
+```
 ### 4. Запуск застосунку
 ```bash
 streamlit run app.py
-
+```
 Веб-інтерфейс автоматично відкриється у вашому браузері за адресою http://localhost:8501
 
 ---
@@ -126,4 +127,4 @@ streamlit run app.py
 -    «Скільки грошей у мене залишилося?»
 
 -    «Зроби мені короткий аналітичний звіт по категоріях»
-````
+
