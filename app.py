@@ -35,7 +35,7 @@ st.markdown(
     """
     <style>
     html, body, [class*="css"]  {
-        font-family: 'Calibri', sans-serif; 
+        font-family: 'Nunito', monospace !important;
     }
     
     /* Зміна фону самого вікна, де відображається чат */
@@ -47,9 +47,14 @@ st.markdown(
 
     /* Зміна фону всього зовнішнього контейнера інпуту */
     [data-testid="stChatInput"] {
-        background-color: #e6e6fa !important; 
+        background-color: #ede6fa !important; 
         border-radius: 14px !important;       
         padding: 4px !important;
+    }
+
+    [data-testid=stSidebar] {
+        background-color: #ede6fa;
+        font-family: 'Nunito', monospace !important;
     }
     
     /* Повідомлення асистента */
