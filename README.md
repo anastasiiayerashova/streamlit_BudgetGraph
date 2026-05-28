@@ -75,6 +75,7 @@
 
 ````bash
 git clone [https://github.com/anastasiiayerashova/streamlit_BudgetGraph](https://github.com/anastasiiayerashova/streamlit_BudgetGraph)
+```
 
 ### 2. Встановлення залежностей
 ```bash
