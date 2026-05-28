@@ -44,8 +44,15 @@ st.markdown(
         border-radius: 12px;
         margin-bottom: 10px;
     }
+
+    /* Зміна фону всього зовнішнього контейнера інпуту */
+    [data-testid="stChatInput"] {
+        background-color: #e6e6fa !important; 
+        border-radius: 14px !important;       
+        padding: 4px !important;
+    }
     
-    /* повідомлення асистента */
+    /* Повідомлення асистента */
     [data-testid="stChatMessageAssistant"] {
         background-color: #e8f1f5 !important; /* Ніжно-блакитний для бота */
     }
@@ -229,7 +236,6 @@ with st.sidebar:
 
         st.altair_chart(chart, use_container_width=True)
 
-        # МАЛЕНЬКА ПРИМІТКА ДЛЯ КОРИСТУВАЧА
         st.caption("💡 *Підказка: наведіть курсор на сектор діаграми, щоб побачити точну суму витрат.*")
 
     else:
@@ -280,12 +286,49 @@ with st.sidebar:
                 "messages": [str(m) for m in st.session_state.messages],
             }
             st.download_button(
-                "📥 Експорт",
+                "📥 Експорт (JSON)",
                 data=json.dumps(export_data, ensure_ascii=False, indent=2),
                 file_name=f"finance_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
                 mime="application/json",
                 use_container_width=True,
             )
+
+            # --------------------------------------------------------
+            # Експорт у Excel через openpyxl
+            # --------------------------------------------------------
+            if expenses:
+                import io
+                
+                # Конвертуємо список транзакцій у DataFrame та робимо гарні назви колонок
+                df_to_excel = pd.DataFrame(expenses)
+                
+                # Перейменовуємо та впорядковуємо колонки 
+                column_mapping = {
+                    "amount": "Сума (грн)",
+                    "category": "Категорія",
+                    "description": "Опис транзакції"
+                }
+                df_to_excel = df_to_excel.rename(columns=column_mapping)
+                
+                # Залишаємо лише ті колонки, які є у маппінгу
+                available_cols = [col for col in column_mapping.values() if col in df_to_excel.columns]
+                df_to_excel = df_to_excel[available_cols]
+
+                # Записуємо у бінарний потік BytesIO за допомогою openpyxl
+                buffer = io.BytesIO()
+                with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+                    df_to_excel.to_excel(writer, index=False, sheet_name="Витрати")
+                
+                # Повертаємо покажчик на початок файлу
+                buffer.seek(0)
+
+                st.download_button(
+                    label="📊 Експорт в Excel",
+                    data=buffer,
+                    file_name=f"finance_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                )
 
 # ============================================================
 # ФУНКЦІЇ ДЛЯ ЗВИЧАЙНОГО РЕЖИМУ (СТРІМІНГ GEMINI)
@@ -357,7 +400,7 @@ if user_input := st.chat_input("Введіть запит..."):
             st.rerun()
 
         else:
-            # 💬 РЕЖИМ №2: ЗВИЧАЙНИЙ ЧАТ (Стрімінг з урахуванням кастомного Системного промпту)
+            # 💬 РЕЖИМ №2: ЗВИЧАЙНИЙ ЧАТ (Стрімінг з урахуванням кастомного системного промпту)
             ai_text = ""
             response_stream = stream_gemini_response(
                 prompt=user_input, 
@@ -372,67 +415,3 @@ if user_input := st.chat_input("Введіть запит..."):
             response_placeholder.markdown(ai_text)
             st.session_state.messages.append({"role": "assistant", "content": ai_text})
 
-# # ============================================================
-# # РЕНДЕРІНГ ЧАТУ
-# # ============================================================
-# # Відображення історії повідомлень з session_state
-# for message in st.session_state.messages:
-#     with st.chat_message(message["role"]):
-#         st.markdown(message["content"])
-
-# # Поле введення користувача
-# if user_input := st.chat_input("Напишіть: 'Додай 250 грн на таксі' або 'Який мій ліміт?'"):
-#     # Відображаємо повідомлення користувача
-#     st.chat_message("user").markdown(user_input)
-#     st.session_state.messages.append({"role": "user", "content": user_input})
-
-#     with st.chat_message("assistant"):
-#         response_placeholder = st.empty()
-#         debug_placeholder = st.empty()
-
-#         if "Агент" in mode:
-#             # --- РОБОТА З LANGGRAPH АГЕНТОМ ---
-#             config = {"configurable": {"thread_id": st.session_state.thread_id}}
-            
-#             # Відправляємо репліку користувача в граф
-#             events = agent.stream(
-#                 {"messages": [HumanMessage(content=user_input)]}, 
-#                 config, 
-#                 stream_mode="values"
-#             )
-            
-#             final_message = None
-#             all_messages = []
-            
-#             # Читаємо стрім станів графа
-#             for event in events:
-#                 if "messages" in event:
-#                     all_messages = event["messages"]
-#                     final_message = all_messages[-1]
-            
-#             # Витягуємо текст відповіді моделі
-#             ai_text = extract_response_text(final_message) if final_message else "Не вдалося отримати відповідь."
-#             response_placeholder.markdown(ai_text)
-            
-#             # Відображення Debug (інструментів), якщо потрібно
-#             with st.sidebar:
-#                 show_debug = st.checkbox("Показувати дебаг інструментів", value=False)
-#             if show_debug:
-#                 debug_info = extract_tools_debug(all_messages)
-#                 if debug_info:
-#                     debug_placeholder.json(debug_info)
-            
-#             st.session_state.messages.append({"role": "assistant", "content": ai_text})
-            
-#             # Важливо: перезапускаємо сторінку, щоб sidebar миттєво оновив ліміти та прогрес-бар
-#             st.rerun()
-
-#         else:
-#             # --- ЗВИЧАЙНИЙ РЕЖИМ (ФОЛБЕК БЕЗ ІНСТРУМЕНТІВ) ---
-#             # залишити прямий стрімінг без бази даних:
-#             from app import stream_gemini_response # Або реалізація функції нижче
-            
-#             ai_text = ""
-#             # Для простоти викликаємо звичайне генераційне вікно 
-#             # Тут можна викликати `stream_gemini_response(user_input, ...)`
-#             response_placeholder.markdown("Цей режим працює без збереження витрат.")
