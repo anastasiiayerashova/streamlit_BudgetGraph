@@ -145,7 +145,7 @@ with st.sidebar:
         delta_color=delta_color
     )
 
-    # --- НОВИЙ БЛОК: ПРОГНОЗУВАННЯ ВИТРАТ ---
+    # --- ПРОГНОЗУВАННЯ ВИТРАТ ---
     # Обчислюємо різницю між лімітом та прогнозом
     prediction_delta = monthly_limit - predicted_spent
     
