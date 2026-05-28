@@ -150,7 +150,3 @@
 - Email: yerashova.a@gmail.com
 
 > Thank you for checking out the project! If you found it helpful or interesting, feel free to leave a ⭐ on the repository.
-
-```
-
-```
