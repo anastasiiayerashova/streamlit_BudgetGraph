@@ -20,6 +20,7 @@ st.markdown(
     /* Застосовуємо шрифт до всіх елементів інтерфейсу */
     html, body, [class*="css"], .stApp, div, span, p, h1, h2, h3, h4, h5, h6, label {
         font-family: 'Nunito', sans-serif !important;
+        background-color: #e6faf0 !important; 
     }
     
     /* Зміна фону самого вікна, де відображається чат */
