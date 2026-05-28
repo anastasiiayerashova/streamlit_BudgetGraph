@@ -96,6 +96,12 @@ if "thread_id" not in st.session_state:
 if "system_prompt" not in st.session_state:
     st.session_state.system_prompt = "Ти корисний фінансовий асистент. Відповідай українською мовою."
 
+# --------------------------------------------------------
+# Сховище для дебагу поточної репліки
+# --------------------------------------------------------
+if "current_debug" not in st.session_state:
+    st.session_state.current_debug = None
+
 # Отримуємо ПЛИННИЙ СТАН графа LangGraph (для лімітів та витрат)
 config = {"configurable": {"thread_id": st.session_state.thread_id}}
 graph_state = agent.get_state(config)
@@ -297,6 +303,14 @@ with st.sidebar:
         key="temperature_slider"
     )
 
+    # --------------------------------------------------------
+    # Чекбокс для дебагу
+    # --------------------------------------------------------
+    show_agent_debug = False
+    if "Агент" in mode:
+        show_agent_debug = st.checkbox("🔍 Показувати дебаг інструментів", value=False)
+    # --------------------------------------------------------
+
     with st.expander("📝 Системний промпт (чат)"):
         sys_prompt_input = st.text_area("Інструкції", value=st.session_state.system_prompt, height=100)
         if st.button("💾 Зберегти", use_container_width=True):
@@ -412,6 +426,14 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
+# --------------------------------------------------------
+# НОВИЙ БЛОК: Виводимо збережений дебаг під останнім повідомленням
+# --------------------------------------------------------
+if "Агент" in mode and show_agent_debug and st.session_state.get("current_debug"):
+    with st.expander("🛠️ Дебаг: виклики інструментів", expanded=False):
+        st.json(st.session_state.current_debug)
+# --------------------------------------------------------
+
 # Нове повідомлення від користувача
 if user_input := st.chat_input("Введіть запит..."):
     st.chat_message("user").markdown(user_input)
@@ -436,6 +458,17 @@ if user_input := st.chat_input("Введіть запит..."):
             ai_text = extract_response_text(final_message) if final_message else "Помилка відповіді графа."
             response_placeholder.markdown(ai_text)
             st.session_state.messages.append({"role": "assistant", "content": ai_text})
+
+            # --------------------------------------------------------
+            # ОНОВЛЕНО: Зберігаємо дебаг в сесію перед тим, як перезапустити сторінку
+            # --------------------------------------------------------
+            if all_messages:
+                debug_info = extract_tools_debug(all_messages)
+                st.session_state.current_debug = debug_info if debug_info else None
+            else:
+                st.session_state.current_debug = None
+            # --------------------------------------------------------
+
             st.rerun()
 
         else:
