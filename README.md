@@ -71,58 +71,61 @@
 
 ## 🚀 Швидкий запуск
 
-### 1. Клонування репозиторію
+1.  **Клонування репозиторію:**
 
-````bash
-git clone [https://github.com/anastasiiayerashova/streamlit_BudgetGraph](https://github.com/anastasiiayerashova/streamlit_BudgetGraph)
+    ```bash
+    git clone https://github.com/anastasiiayerashova/streamlit_BudgetGraph
+    ```
 
-### 2. Встановлення залежностей
-```bash
-pip install -r requirements.txt
+2.  **Встановлення залежностей:**
 
-### 3. Налаштування API Ключа
+    ```bash
+    pip install -r requirements.txt
+    ```
 
-Створіть директорію .streamlit та файл secrets.toml у корені проєкту:
+3.  **Налаштування API Ключа:**
+    Створіть директорію .streamlit та файл secrets.toml у корені проєкту:
 
-```bash
-mkdir .streamlit
-touch .streamlit/secrets.toml
+    ```bash
+    mkdir .streamlit
+    touch .streamlit/secrets.toml
+    ```
 
-Додайте туди свій ключ від Google AI Studio:
+4.  **Додайте туди свій ключ від Google AI Studio:**
 
-```bash
-GOOGLE_API_KEY = "ваш_api_ключ_gemini"
+    ```bash
+    GOOGLE_API_KEY = "ваш_api_ключ_gemini"
+    ```
 
-### 4. Запуск застосунку
-```bash
-streamlit run app.py
-
-Веб-інтерфейс автоматично відкриється у вашому браузері за адресою http://localhost:8501
+5.  **Запуск застосунку:**
+    Веб-інтерфейс автоматично відкриється у вашому браузері за адресою http://localhost:8501
+    ```bash
+    streamlit run app.py
+    ```
 
 ---
 
 ## 📂 Структура проєкту
 
 ├── .streamlit/
-│   └── secrets.toml          # Токени доступу (API ключі)
+│ └── secrets.toml # Токени доступу (API ключі)
 ├── ui/
-│   ├── styles.py             # Кастомні стилі сторінки Streamlit
-├── app.py                    # Головний файл інтерфейсу та логіки UI Streamlit
-├── agent.py                  # Опис архітектури LangGraph, вузлів та інструментів
-├── README.md                 # Документація проєкту
-└── requirements.txt          # Список залежностей проєкту
+│ ├── styles.py # Кастомні стилі сторінки Streamlit
+├── app.py # Головний файл інтерфейсу та логіки UI Streamlit
+├── agent.py # Опис архітектури LangGraph, вузлів та інструментів
+├── README.md # Документація проєкту
+└── requirements.txt # Список залежностей проєкту
 
 ---
 
 ## 💡 Приклади запитів для тестування
 
--    «Привіт! Запиши будь ласка 320 гривень на продукти, купила фрукти та молоко»
+- «Привіт! Запиши будь ласка 320 гривень на продукти, купила фрукти та молоко»
 
--    «Я сьогодні витратив 1500 грн на ремонт кросівок, категорія одяг»
+- «Я сьогодні витратив 1500 грн на ремонт кросівок, категорія одяг»
 
--    «Зміни мій місячний ліміт на 15000 грн»
+- «Зміни мій місячний ліміт на 15000 грн»
 
--    «Скільки грошей у мене залишилося?»
+- «Скільки грошей у мене залишилося?»
 
--    «Зроби мені короткий аналітичний звіт по категоріях»
-````
+- «Зроби мені короткий аналітичний звіт по категоріях»
