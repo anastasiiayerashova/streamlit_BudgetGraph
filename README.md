@@ -126,11 +126,15 @@
 
 - «Я сьогодні витратив 1500 грн на ремонт кросівок, категорія одяг»
 
+<img width="1919" height="991" alt="image" src="https://github.com/user-attachments/assets/d1aef296-83cd-41e9-8675-20519c0c875d" />
+
 - «Зміни мій місячний ліміт на 15000 грн»
 
 - «Скільки грошей у мене залишилося?»
 
 - «Зроби мені короткий аналітичний звіт по категоріях»
+
+<img width="1919" height="987" alt="image" src="https://github.com/user-attachments/assets/2c6739bc-9e2c-46e5-8621-51095dcbee2f" />
 
 ---
 
