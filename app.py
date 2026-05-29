@@ -31,6 +31,29 @@ from agent import (
 
 apply_page_config()
 
+st.markdown("""
+<style>
+    [data-testid=stSidebar] {
+        background-color: #ede6fa;
+    }
+  
+    div[data-testid="stChatMessage"] {
+        background-color: #ede6fa;
+        color: black; 
+    }
+            
+    div[data-testid="stChatInput"] {
+        border: 2px solid #c7b3f0; 
+        border-radius: 14px;
+    }
+            
+    div[data-testid="stChatInput"]:focus-within {
+        border-color: #FFA500; 
+        
+    }
+</style>
+""", unsafe_allow_html=True)
+
 
 # ============================================================
 # ІНІЦІАЛІЗАЦІЯ
@@ -67,6 +90,7 @@ if "system_prompt" not in st.session_state:
 
 if "current_debug" not in st.session_state:
     st.session_state.current_debug = None
+
 
 # Отримуємо стан графа (для лімітів та витрат)
 config = {"configurable": {"thread_id": st.session_state.thread_id}}
