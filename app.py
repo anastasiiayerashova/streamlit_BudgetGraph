@@ -85,7 +85,16 @@ agent = get_langgraph_agent(api_key, MODEL_NAME)
 # ============================================================
 
 if "messages" not in st.session_state:
-    st.session_state.messages = []
+    st.session_state.messages = [
+        {
+            "role": "assistant", 
+            "content": "👋 **Вітаю! Я твій ШІ-асистент особистих фінансів.**\n\n"
+                       "Я допоможу тобі вести облік витрат, контролювати ліміти та аналізувати бюджет. "
+                       "Ти можеш спілкуватися зі мною у звичайному режимі або увімкнути режим Агента, "
+                       "щоб я фіксував твої транзакції в базі даних.\n\n"
+                       "**Спробуй сказати:** *«Я витратив 250 грн на таксі»* або *«Встанови місячний ліміт 15000 грн»*."
+        }
+    ]
 
 if "thread_id" not in st.session_state:
     st.session_state.thread_id = str(uuid.uuid4())[:8]
