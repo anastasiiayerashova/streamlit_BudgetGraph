@@ -49,7 +49,12 @@ st.markdown("""
             
     div[data-testid="stChatInput"]:focus-within {
         border-color: #FFA500; 
-        
+    }
+            
+    [data-testid="stMetricValue"] {
+        font-size: 24px;
+        font-weight: bold;
+        color: #4B0082;
     }
 </style>
 """, unsafe_allow_html=True)
