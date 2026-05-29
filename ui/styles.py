@@ -38,7 +38,7 @@ st.markdown(
     }
 
     [data-testid=stSidebar] {
-        background-color: #ede6fa;
+        background-color: #ede6fa !important;
         font-family: 'Nunito', monospace !important;
     }
     
